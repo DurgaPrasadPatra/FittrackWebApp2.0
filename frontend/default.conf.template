@@ -1,0 +1,44 @@
+server {
+    listen 80;
+    listen [::]:80;
+
+    # Serves the static HTML page for any non-API request
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ =404;
+    }
+
+    # Routes /api/* to bmi-service
+    location /api/ {
+        resolver 127.0.0.11 valid=10s;   # Docker's internal DNS — re-resolves per request
+        set $backend "http://${BACKEND_HOST}:${BACKEND_PORT}";
+        rewrite ^/api/(.*)$ /$1 break;   # strips "/api" before forwarding
+        proxy_pass $backend;
+        proxy_set_header Host $host;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 10s;
+    }
+
+    # Routes /track/* to tracker-service
+    location /track/ {
+        resolver 127.0.0.11 valid=10s;
+        set $tracker_backend "http://${TRACKER_HOST}:${TRACKER_PORT}";
+        rewrite ^/track/(.*)$ /$1 break;
+        proxy_pass $tracker_backend;
+        proxy_set_header Host $host;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 10s;
+    }
+
+    # Routes /summary/* to summary-worker (NEW this phase)
+    location /summary/ {
+        resolver 127.0.0.11 valid=10s;
+        set $summary_backend "http://${SUMMARY_HOST}:${SUMMARY_PORT}";
+        rewrite ^/summary/(.*)$ /$1 break;
+        proxy_pass $summary_backend;
+        proxy_set_header Host $host;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 10s;
+    }
+}

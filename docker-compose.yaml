@@ -1,0 +1,144 @@
+services:
+
+  # ── Data tier: PostgreSQL ──
+  # Stores every raw log entry permanently. The named volume below
+  # keeps this data alive even if the container is deleted.
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data   # named volume: survives container removal
+    healthcheck:
+      # Postgres takes a few seconds to be ready to accept connections.
+      # This tells Docker when it's actually usable, not just "started".
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - fittrack-net
+
+  # ── Data tier: Redis ──
+  # In-memory cache. Fast, but not meant for permanent storage
+  # (no volume attached — data is lost if the container is removed,
+  # which is fine, since it's only a cache).
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]   # Redis replies "PONG" when ready
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - fittrack-net
+
+  # ── Application tier: bmi-service ──
+  # Stateless calculator. No database, no dependency on anything else.
+  bmi-service:
+    build: ./bmi-service
+    image: devopsdurga/fittrack-api:1.0
+    container_name: fittrackapi
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - fittrack-net
+
+  # ── Application tier: tracker-service ──
+  # Writes/reads raw logs (water, steps, sleep) to/from Postgres.
+  tracker-service:
+    build: ./tracker-service
+    image: devopsdurga/fittrack-tracker:1.0
+    container_name: tracker-service
+    environment:
+      # DB_HOST=postgres works because Docker's internal DNS resolves
+      # "postgres" to the postgres container's IP on this network.
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy   # wait for Postgres to be ready, not just "started"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - fittrack-net
+
+  # ── Application tier: summary-worker (NEW this phase) ──
+  # Reads from Postgres, caches the result in Redis. Demonstrates the
+  # "cache-aside" pattern: check cache first, fall back to DB on a miss.
+  summary-worker:
+    build: ./summary-worker
+    image: devopsdurga/fittrack-summary:1.0
+    container_name: summary-worker
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_TTL_SECONDS=60   # how long a cached summary stays valid
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy   # this service needs BOTH to be ready
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - fittrack-net
+
+  # ── Presentation tier: frontend (Nginx gateway) ──
+  # The ONLY container exposed to the outside world (port 80).
+  # Routes requests to the correct backend based on URL prefix.
+  frontend:
+    build: ./frontend
+    image: devopsdurga/fittrack-frontend:v2.0
+    container_name: fittrackfrontend
+    ports:
+      - "80:80"      # only this line opens a port to the host/internet
+    environment:
+      - BACKEND_HOST=fittrackapi
+      - BACKEND_PORT=8000
+      - TRACKER_HOST=tracker-service
+      - TRACKER_PORT=8000
+      - SUMMARY_HOST=summary-worker
+      - SUMMARY_PORT=8000
+    depends_on:
+      bmi-service:
+        condition: service_healthy
+      tracker-service:
+        condition: service_healthy
+      summary-worker:
+        condition: service_healthy
+    networks:
+      - fittrack-net
+
+# Custom bridge network: lets containers resolve each other by name.
+# Without this, containers would only see each other by IP, which
+# changes every restart.
+networks:
+  fittrack-net:
+    driver: bridge
+
+# Named volume: Docker manages the actual storage location on the host.
+# Declared here so `docker compose down` (without -v) leaves it intact.
+volumes:
+  pgdata:

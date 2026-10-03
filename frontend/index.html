@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FitTrack</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f0f4f8; margin: 0; padding: 20px; }
+    .card { max-width: 420px; margin: 30px auto; background: #fff; padding: 24px;
+            border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+    h1 { margin-top: 0; color: #2b7a4b; }
+    h2 { font-size: 16px; color: #2b7a4b; margin-top: 24px; }
+    label { display: block; margin: 12px 0 4px; font-size: 14px; color: #444; }
+    input, select { width: 100%; padding: 8px; box-sizing: border-box;
+                    border: 1px solid #ccc; border-radius: 6px; }
+    button { width: 100%; margin-top: 18px; padding: 10px; background: #2b7a4b;
+             color: #fff; border: 0; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    button.secondary { background: #4478c4; }
+    #result { margin-top: 18px; padding: 12px; background: #e8f5ee; border-radius: 8px; display: none; }
+    #logResult { margin-top: 10px; padding: 10px; background: #eaf1fb; border-radius: 8px; display: none; font-size: 14px; }
+    #error { color: #b00020; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>FitTrack</h1>
+
+    <label>Weight (kg)</label><input id="weight" type="number" value="70">
+    <label>Height (cm)</label><input id="height" type="number" value="175">
+    <label>Age</label><input id="age" type="number" value="30">
+    <label>Sex</label>
+    <select id="sex"><option value="male">Male</option><option value="female">Female</option></select>
+    <label>Activity</label>
+    <select id="activity">
+      <option value="sedentary">Sedentary</option>
+      <option value="light" selected>Light</option>
+      <option value="moderate">Moderate</option>
+      <option value="active">Active</option>
+    </select>
+
+    <button onclick="calculate()">Calculate</button>
+    <div id="result"></div>
+
+    <h2>Log today's weight</h2>
+    <label>Today's weight (kg)</label><input id="logWeight" type="number" value="70">
+    <button class="secondary" onclick="logWeight()">Save today's weight</button>
+    <div id="logResult"></div>
+
+    <div id="error"></div>
+  </div>
+
+  <script>
+    async function post(path, body) {
+      const r = await fetch('/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || ('API error ' + r.status));
+      return r.json();
+    }
+
+    async function calculate() {
+      const weight = parseFloat(document.getElementById('weight').value);
+      const height = parseFloat(document.getElementById('height').value);
+      const age = parseInt(document.getElementById('age').value);
+      const sex = document.getElementById('sex').value;
+      const activity = document.getElementById('activity').value;
+
+      const box = document.getElementById('result');
+      const err = document.getElementById('error');
+      err.textContent = '';
+
+      try {
+        const bmi = await post('api/bmi', { weight_kg: weight, height_cm: height, age, sex, activity });
+        const cal = await post('api/calories', { weight_kg: weight, height_cm: height, age, sex, activity });
+
+        box.style.display = 'block';
+        box.innerHTML = `<b>BMI:</b> ${bmi.bmi} (${bmi.category})<br>
+                         <b>BMR:</b> ${cal.bmr} kcal/day<br>
+                         <b>Daily calories:</b> ${cal.daily_calories} kcal`;
+      } catch (e) {
+        box.style.display = 'none';
+        err.textContent = e.message;
+      }
+    }
+
+    async function logWeight() {
+      const err = document.getElementById('error');
+      const logBox = document.getElementById('logResult');
+      err.textContent = '';
+      try {
+        const w = parseFloat(document.getElementById('logWeight').value);
+        const saved = await post('track/log', { weight_kg: w });
+        logBox.style.display = 'block';
+        logBox.textContent = `Saved ${saved.weight_kg} kg for ${saved.log_date}`;
+      } catch (e) {
+        logBox.style.display = 'none';
+        err.textContent = e.message;
+      }
+    }
+  </script>
+</body>
+</html>

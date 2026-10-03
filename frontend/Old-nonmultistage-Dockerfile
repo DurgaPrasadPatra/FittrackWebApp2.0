@@ -1,0 +1,13 @@
+# nginx:alpine already has its own ENTRYPOINT/CMD to start Nginx —
+# we only override the config and static content
+FROM nginx:alpine
+COPY default.conf.template /etc/nginx/templates/default.conf.template
+COPY index.html /usr/share/nginx/html/index.html
+
+# Defaults — overridden per environment via docker-compose.yml or -e flags
+ENV BACKEND_HOST=bmi-service
+ENV BACKEND_PORT=8000
+ENV TRACKER_HOST=tracker-service
+ENV TRACKER_PORT=8000
+ENV SUMMARY_HOST=summary-worker
+ENV SUMMARY_PORT=8000

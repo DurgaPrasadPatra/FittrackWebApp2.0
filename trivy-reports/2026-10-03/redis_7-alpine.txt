@@ -1,0 +1,36 @@
+
+Report Summary
+
+┌────────────────────────────────┬────────┬─────────────────┬─────────┐
+│             Target             │  Type  │ Vulnerabilities │ Secrets │
+├────────────────────────────────┼────────┼─────────────────┼─────────┤
+│ redis:7-alpine (alpine 3.21.8) │ alpine │        4        │    -    │
+└────────────────────────────────┴────────┴─────────────────┴─────────┘
+Legend:
+- '-': Not scanned
+- '0': Clean (no security findings detected)
+
+
+redis:7-alpine (alpine 3.21.8)
+==============================
+Total: 4 (HIGH: 4, CRITICAL: 0)
+
+┌────────────┬────────────────┬──────────┬────────┬───────────────────┬───────────────┬──────────────────────────────────────────────────────────────┐
+│  Library   │ Vulnerability  │ Severity │ Status │ Installed Version │ Fixed Version │                            Title                             │
+├────────────┼────────────────┼──────────┼────────┼───────────────────┼───────────────┼──────────────────────────────────────────────────────────────┤
+│ libcrypto3 │ CVE-2026-75804 │ HIGH     │ fixed  │ 3.3.7-r1          │ 3.3.7-r2      │ openssl: OpenSSL: Denial of Service via unenforced QUIC      │
+│            │                │          │        │                   │               │ connection flow control                                      │
+│            │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2026-75804                   │
+│            ├────────────────┤          │        │                   │               ├──────────────────────────────────────────────────────────────┤
+│            │ CVE-2026-84782 │          │        │                   │               │ openssl: compat-openssl: openssl: Information disclosure via │
+│            │                │          │        │                   │               │ DTLS handshake retransmission                                │
+│            │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2026-84782                   │
+├────────────┼────────────────┤          │        │                   │               ├──────────────────────────────────────────────────────────────┤
+│ libssl3    │ CVE-2026-75804 │          │        │                   │               │ openssl: OpenSSL: Denial of Service via unenforced QUIC      │
+│            │                │          │        │                   │               │ connection flow control                                      │
+│            │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2026-75804                   │
+│            ├────────────────┤          │        │                   │               ├──────────────────────────────────────────────────────────────┤
+│            │ CVE-2026-84782 │          │        │                   │               │ openssl: compat-openssl: openssl: Information disclosure via │
+│            │                │          │        │                   │               │ DTLS handshake retransmission                                │
+│            │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2026-84782                   │
+└────────────┴────────────────┴──────────┴────────┴───────────────────┴───────────────┴──────────────────────────────────────────────────────────────┘
